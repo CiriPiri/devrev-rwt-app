@@ -28,7 +28,7 @@ export default function App() {
 
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const res = await fetch(`${baseUrl}/api/timeline/${sanitizedId}`);
+      const res = await fetch(`${baseUrl}api/timeline/${sanitizedId}`);
       const result = await res.json();
 
       if (!res.ok || !result.success) throw new Error(result.message || 'API Error');
