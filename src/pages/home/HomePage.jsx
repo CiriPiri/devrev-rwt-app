@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Globe } from 'lucide-react'; // ADDED GLOBE ICON
 import { SearchBar } from '../../features/search/SearchBar';
 import { RwtRules } from '../../widgets/metrics/RwtRules';
 import { TelemetryTable } from '../../widgets/telemetry/TelemetryTable';
@@ -8,9 +9,10 @@ import { calculateRWT } from '../../shared/lib/rwtEngine';
 
 export function HomePage() {
     const [ticketId, setTicketId] = useState('');
-    const [status, setStatus] = useState('idle'); // Strictly 'idle', 'loading', 'success', 'error'
+    const [status, setStatus] = useState('idle');
     const [errorMsg, setErrorMsg] = useState('');
     const [events, setEvents] = useState([]);
+    const [ticketMeta, setTicketMeta] = useState(null); // NEW METADATA STATE
 
     const handleFetch = async (e) => {
         e.preventDefault();
@@ -22,18 +24,25 @@ export function HomePage() {
         setStatus('loading');
         setErrorMsg('');
         setEvents([]);
+        setTicketMeta(null);
 
         try {
             const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
             const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
+            // 1. FETCH TICKET METADATA CONCURRENTLY
+            const metaPromise = fetch(`${baseUrl}/api/ticket/${sanitizedId}`)
+                .then(res => res.json())
+                .then(res => {
+                    if (!res.success) throw new Error(res.message || 'Meta API Error');
+                    return res.data;
+                });
+
+            // 2. FETCH TIMELINE LOGS
             let currentCursor = null;
             let hasNext = true;
-            let accumulatedEvents = []; // Store data in standard memory, NOT React state
+            let accumulatedEvents = [];
 
-            // 1. SILENT BACKGROUND FETCHING
-            // We loop through the DevRev API until all pages are retrieved, 
-            // preventing Vercel timeouts while avoiding UI thrashing.
             while (hasNext) {
                 const cursorQuery = currentCursor ? `?cursor=${encodeURIComponent(currentCursor)}` : '';
                 const res = await fetch(`${baseUrl}/api/timeline/${sanitizedId}${cursorQuery}`);
@@ -47,13 +56,15 @@ export function HomePage() {
                 hasNext = !!currentCursor;
             }
 
-            // 2. DATA VALIDATION
             if (accumulatedEvents.length === 0) {
                 throw new Error(`No stage telemetry found for ${sanitizedId}`);
             }
 
-            // 3. ATOMIC STATE UPDATE
-            // Sort the complete dataset once, and trigger exactly ONE React render.
+            // 3. RESOLVE METADATA
+            const metaData = await metaPromise;
+            setTicketMeta(metaData);
+
+            // 4. ATOMIC STATE UPDATE
             const sortedEvents = accumulatedEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
             setEvents(sortedEvents);
             setStatus('success');
@@ -64,18 +75,30 @@ export function HomePage() {
         }
     };
 
+    // PASS THE SLA REGION INTO THE MATH ENGINE
     const metrics = useMemo(() => {
         if (events.length === 0) return { hours: 0, mins: 0 };
-        return calculateRWT(events);
-    }, [events]);
+        return calculateRWT(events, ticketMeta?.slaRegion);
+    }, [events, ticketMeta]);
 
     return (
         <div className="max-w-7xl mx-auto p-6 md:p-10 flex flex-col gap-8">
-
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-800 pb-6">
                 <div>
-                    <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">RWT Engine</h1>
-                    <p className="text-sm text-zinc-500 mt-1">DevRev SLA calculations.</p>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">RWT Engine</h1>
+
+                        {/* DYNAMIC REGION BADGE */}
+                        {ticketMeta && (
+                            <span className="flex items-center gap-1.5 text-[10px] font-mono font-bold tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20 uppercase">
+                                <Globe className="w-3 h-3" />
+                                {ticketMeta.slaRegion}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-zinc-500 mt-1">
+                        {ticketMeta ? ticketMeta.title : 'DevRev SLA calculations.'}
+                    </p>
                 </div>
                 <SearchBar
                     ticketId={ticketId}
@@ -86,7 +109,6 @@ export function HomePage() {
             </header>
 
             <main className="flex-grow w-full">
-
                 {status === 'error' && (
                     <div className="border border-red-900/50 text-red-400 p-4 rounded-md text-sm mb-6 bg-red-950/20">
                         Error: {errorMsg}
@@ -100,7 +122,6 @@ export function HomePage() {
                     </div>
                 )}
 
-                {/* BATCH LOADING STATE */}
                 {status === 'loading' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full">
                         <div className="lg:col-span-1 flex flex-col gap-6">
@@ -115,7 +136,6 @@ export function HomePage() {
                     </div>
                 )}
 
-                {/* ATOMIC SUCCESS RENDER */}
                 {status === 'success' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in duration-300">
                         <div className="lg:col-span-1 flex flex-col gap-6">
