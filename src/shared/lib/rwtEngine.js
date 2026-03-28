@@ -69,25 +69,22 @@ export function calculateRWT(events) {
 
   events.forEach((ev) => {
     const toState = ev.to.toLowerCase();
-    const fromState = ev.from.toLowerCase();
-
-    // Optimize: If transitioning between two open states, ignore the stop/start overhead
-    if (openStates.includes(fromState) && openStates.includes(toState)) {
-      // Do nothing, the timer remains running from the original lastOpenTime
-      return;
-    }
-
-    if (lastOpenTime) {
-      totalMinutes += getWorkingMinutes(lastOpenTime, ev.timestamp);
-      lastOpenTime = null;
-    }
 
     if (openStates.includes(toState)) {
-      lastOpenTime = ev.timestamp;
+      // If entering an active state, start the timer ONLY if it isn't already running
+      if (!lastOpenTime) {
+        lastOpenTime = ev.timestamp;
+      }
+    } else {
+      // If entering a paused state, calculate accumulated time and stop the timer
+      if (lastOpenTime) {
+        totalMinutes += getWorkingMinutes(lastOpenTime, ev.timestamp);
+        lastOpenTime = null;
+      }
     }
   });
 
-  // Handle active "currently open" tickets
+  // If the ticket is currently still open, calculate up to exactly right now
   if (lastOpenTime) {
     totalMinutes += getWorkingMinutes(lastOpenTime, new Date().toISOString());
   }

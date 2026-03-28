@@ -8,7 +8,7 @@ import { calculateRWT } from '../../shared/lib/rwtEngine';
 
 export function HomePage() {
     const [ticketId, setTicketId] = useState('');
-    const [status, setStatus] = useState('idle');
+    const [status, setStatus] = useState('idle'); // Strictly 'idle', 'loading', 'success', 'error'
     const [errorMsg, setErrorMsg] = useState('');
     const [events, setEvents] = useState([]);
 
@@ -26,15 +26,38 @@ export function HomePage() {
         try {
             const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
             const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
-            const res = await fetch(`${baseUrl}/api/timeline/${sanitizedId}`);
-            const result = await res.json();
 
-            if (!res.ok || !result.success) throw new Error(result.message || 'API Error');
-            if (result.data.length === 0) throw new Error(`No telemetry found for ${sanitizedId}`);
+            let currentCursor = null;
+            let hasNext = true;
+            let accumulatedEvents = []; // Store data in standard memory, NOT React state
 
-            const sortedEvents = result.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            // 1. SILENT BACKGROUND FETCHING
+            // We loop through the DevRev API until all pages are retrieved, 
+            // preventing Vercel timeouts while avoiding UI thrashing.
+            while (hasNext) {
+                const cursorQuery = currentCursor ? `?cursor=${encodeURIComponent(currentCursor)}` : '';
+                const res = await fetch(`${baseUrl}/api/timeline/${sanitizedId}${cursorQuery}`);
+                const result = await res.json();
+
+                if (!res.ok || !result.success) throw new Error(result.message || 'API Error');
+
+                accumulatedEvents = [...accumulatedEvents, ...result.data];
+
+                currentCursor = result.next_cursor;
+                hasNext = !!currentCursor;
+            }
+
+            // 2. DATA VALIDATION
+            if (accumulatedEvents.length === 0) {
+                throw new Error(`No stage telemetry found for ${sanitizedId}`);
+            }
+
+            // 3. ATOMIC STATE UPDATE
+            // Sort the complete dataset once, and trigger exactly ONE React render.
+            const sortedEvents = accumulatedEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
             setEvents(sortedEvents);
             setStatus('success');
+
         } catch (err) {
             setErrorMsg(err.message);
             setStatus('error');
@@ -47,7 +70,7 @@ export function HomePage() {
     }, [events]);
 
     return (
-        <div className="max-w-6xl mx-auto p-6 md:p-10 flex flex-col gap-8">
+        <div className="max-w-7xl mx-auto p-6 md:p-10 flex flex-col gap-8">
 
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-800 pb-6">
                 <div>
@@ -65,39 +88,37 @@ export function HomePage() {
             <main className="flex-grow w-full">
 
                 {status === 'error' && (
-                    <div className="border border-red-900/50 text-red-400 p-4 rounded-md text-sm mb-6 bg-red-950/10">
+                    <div className="border border-red-900/50 text-red-400 p-4 rounded-md text-sm mb-6 bg-red-950/20">
                         Error: {errorMsg}
                     </div>
                 )}
 
                 {status === 'idle' && (
-                    <div className="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-lg p-12 text-center bg-zinc-900/10 min-h-[400px] flex items-center justify-center">
-                        Enter a ticket ID to begin analysis.
+                    <div className="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-lg p-16 flex flex-col items-center justify-center text-center bg-zinc-900/10 min-h-[400px]">
+                        <p className="text-zinc-400 font-medium mb-2">Awaiting Telemetry Query</p>
+                        <p>Enter a DevRev ticket ID above to calculate active business hours.</p>
                     </div>
                 )}
 
-                {/* LOADING STATE: Zero Layout Shift */}
+                {/* BATCH LOADING STATE */}
                 {status === 'loading' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full">
-                        {/* Left Column */}
                         <div className="lg:col-span-1 flex flex-col gap-6">
-                            {/* Loader embedded EXACTLY where the Output card will be */}
                             <div className="h-[142px] border border-zinc-800/50 rounded-lg bg-zinc-900/20">
                                 <DataLoader isLoading={true} />
                             </div>
                             <Skeleton className="h-[340px] w-full" />
                         </div>
-
-                        {/* Right Column */}
                         <div className="lg:col-span-2">
                             <Skeleton className="h-[600px] w-full" />
                         </div>
                     </div>
                 )}
 
+                {/* ATOMIC SUCCESS RENDER */}
                 {status === 'success' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in duration-300">
-                        <div className="lg:col-span-1">
+                        <div className="lg:col-span-1 flex flex-col gap-6">
                             <RwtRules metrics={metrics} ticketId={ticketId} />
                         </div>
                         <div className="lg:col-span-2 h-full">
