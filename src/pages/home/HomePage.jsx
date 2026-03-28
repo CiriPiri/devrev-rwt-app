@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { SearchBar } from '../../features/search/SearchBar';
 import { RwtRules } from '../../widgets/metrics/RwtRules';
 import { TelemetryTable } from '../../widgets/telemetry/TelemetryTable';
+import { DataLoader } from '../../shared/ui/DataLoader';
+import { Skeleton } from '../../shared/ui/Skeleton';
 import { calculateRWT } from '../../shared/lib/rwtEngine';
 
 export function HomePage() {
@@ -47,7 +49,6 @@ export function HomePage() {
     return (
         <div className="max-w-6xl mx-auto p-6 md:p-10 flex flex-col gap-8">
 
-            {/* Page Header */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-800 pb-6">
                 <div>
                     <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">RWT Engine</h1>
@@ -62,28 +63,42 @@ export function HomePage() {
             </header>
 
             <main className="flex-grow w-full">
+
                 {status === 'error' && (
-                    <div className="border border-red-900/50 text-red-400 p-4 rounded-md text-sm mb-6">
+                    <div className="border border-red-900/50 text-red-400 p-4 rounded-md text-sm mb-6 bg-red-950/10">
                         Error: {errorMsg}
                     </div>
                 )}
 
                 {status === 'idle' && (
-                    <div className="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-lg p-12 text-center">
+                    <div className="text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-lg p-12 text-center bg-zinc-900/10 min-h-[400px] flex items-center justify-center">
                         Enter a ticket ID to begin analysis.
                     </div>
                 )}
 
+                {/* LOADING STATE: Zero Layout Shift */}
                 {status === 'loading' && (
-                    <div className="text-sm text-zinc-500 animate-pulse">
-                        Fetching telemetry data...
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full">
+                        {/* Left Column */}
+                        <div className="lg:col-span-1 flex flex-col gap-6">
+                            {/* Loader embedded EXACTLY where the Output card will be */}
+                            <div className="h-[142px] border border-zinc-800/50 rounded-lg bg-zinc-900/20">
+                                <DataLoader isLoading={true} />
+                            </div>
+                            <Skeleton className="h-[340px] w-full" />
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="lg:col-span-2">
+                            <Skeleton className="h-[600px] w-full" />
+                        </div>
                     </div>
                 )}
 
                 {status === 'success' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in duration-300">
                         <div className="lg:col-span-1">
-                            <RwtRules metrics={metrics} />
+                            <RwtRules metrics={metrics} ticketId={ticketId} />
                         </div>
                         <div className="lg:col-span-2 h-full">
                             <TelemetryTable events={events} />
