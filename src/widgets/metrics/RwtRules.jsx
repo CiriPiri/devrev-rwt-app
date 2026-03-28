@@ -33,7 +33,7 @@ export function RwtRules({ metrics, ticketId }) {
                 </div>
             </div>
 
-            {/* Rules Block (Text Heavy & Dense) */}
+            {/* Rules Block (Updated for Dynamic Regional SLAs) */}
             <div className="border border-zinc-800 rounded-lg p-5 bg-zinc-900/20">
                 <h3 className="text-sm font-medium text-zinc-200 mb-4">Calculation Engine Rules</h3>
                 <ul className="text-sm text-zinc-400 space-y-4">
@@ -46,19 +46,19 @@ export function RwtRules({ metrics, ticketId }) {
                         The timer stops immediately upon transition to <code className="text-zinc-300 font-mono text-xs">Awaiting Customer Reply</code>.
                     </li>
                     <li>
-                        <strong className="text-zinc-200 block mb-0.5 font-medium">3. Business Hours</strong>
-                        Time accumulates only between <span className="text-zinc-300 font-mono">09:00</span> and <span className="text-zinc-300 font-mono">17:00</span> local system time.
+                        <strong className="text-zinc-200 block mb-0.5 font-medium">3. Dynamic Business Hours</strong>
+                        Time accumulation is bound by the specific <span className="text-zinc-300">SLA Region</span> assigned to the ticket. All global schedules are strictly evaluated against <span className="text-zinc-300 font-mono">IST (GMT+05:30)</span>.
                     </li>
                     <li>
                         <strong className="text-zinc-200 block mb-0.5 font-medium">4. Weekend Exclusion</strong>
-                        Saturdays and Sundays are bypassed. Friday 17:00 flows directly into Monday 09:00.
+                        Saturdays and Sundays are bypassed entirely. Friday's regional closing time flows directly into Monday's opening time.
                     </li>
                 </ul>
             </div>
 
             {/* User Instruction Banner */}
             <div className="border border-zinc-800 rounded-lg p-4 bg-zinc-900 text-xs text-zinc-400 leading-relaxed">
-                <strong>Note on API Latency:</strong> DevRev paginates timeline events. Tickets with hundreds of comments or state changes will take several seconds to calculate as the engine fetches every historical page.
+                <strong>Note on Vercel Edge Cache:</strong> Initial ticket queries may take a few seconds as the engine parses paginated history. Subsequent queries are served instantly via the Edge Network.
             </div>
         </div>
     );
