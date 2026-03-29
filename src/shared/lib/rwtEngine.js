@@ -92,37 +92,57 @@ export function getWorkingMinutes(startTimeIso, endTimeIso, schedule) {
 /**
  * Parses DevRev timeline events to extract total active RWT based on Region.
  * @param {Array} events - Array of telemetry objects { timestamp, from, to }
+ * @param {string} ticketCreatedAt - ISO 8601 timestamp of exact ticket creation
  * @param {string} regionName - The SLA Region string from the ticket metadata
  * @returns {Object} { hours, mins }
  */
-export function calculateRWT(events, regionName = "DEFAULT") {
-  if (!events || !Array.isArray(events) || events.length === 0) {
-    return { hours: 0, mins: 0 };
-  }
-
-  // Inject the dynamic schedule
+export function calculateRWT(events, ticketCreatedAt, regionName = "DEFAULT") {
   const schedule = getScheduleForRegion(regionName);
 
+  // ✅ NEW SAFEGUARD: If the ticket is brand new and has 0 timeline events,
+  // we still calculate the active time since it was created.
+  if (!events || !Array.isArray(events) || events.length === 0) {
+    if (!ticketCreatedAt) return { hours: 0, mins: 0 };
+
+    const totalMinutes = getWorkingMinutes(
+      ticketCreatedAt,
+      new Date().toISOString(),
+      schedule,
+    );
+    return {
+      hours: Math.floor(totalMinutes / 60),
+      mins: Math.floor(totalMinutes % 60),
+    };
+  }
+
+  const openStates = ["queued", "waiting on assignee", "waiting on clevertap"];
+
   let totalMinutes = 0;
-  let lastOpenTime = null;
-  const openStates = ["queued", "waiting on assignee"];
+
+  // ✅ THE NEW LOGIC: Unconditionally start the clock at the exact creation time.
+  // This guarantees any initial triage delay (e.g., 1 PM creation -> 4 PM moved to queue)
+  // is perfectly captured as active RWT.
+  let lastOpenTime = ticketCreatedAt;
 
   events.forEach((ev) => {
     const toState = ev.to.toLowerCase();
 
     if (openStates.includes(toState)) {
+      // If we move into an active state and the clock isn't running, start it.
       if (!lastOpenTime) {
         lastOpenTime = ev.timestamp;
       }
+      // (If lastOpenTime is already running from ticketCreatedAt, it just keeps ticking).
     } else {
+      // If we move into a paused state (like 'solved'), stop the clock and tally the minutes.
       if (lastOpenTime) {
-        // Pass the schedule down to the math engine
         totalMinutes += getWorkingMinutes(lastOpenTime, ev.timestamp, schedule);
         lastOpenTime = null;
       }
     }
   });
 
+  // If the ticket is currently sitting in an active state right now, calculate up to this exact moment.
   if (lastOpenTime) {
     totalMinutes += getWorkingMinutes(
       lastOpenTime,

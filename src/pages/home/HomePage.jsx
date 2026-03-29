@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Globe } from 'lucide-react'; // ADDED GLOBE ICON
+import { Globe } from 'lucide-react';
 import { SearchBar } from '../../features/search/SearchBar';
 import { RwtRules } from '../../widgets/metrics/RwtRules';
 import { TelemetryTable } from '../../widgets/telemetry/TelemetryTable';
@@ -12,7 +12,8 @@ export function HomePage() {
     const [status, setStatus] = useState('idle');
     const [errorMsg, setErrorMsg] = useState('');
     const [events, setEvents] = useState([]);
-    const [ticketMeta, setTicketMeta] = useState(null); // NEW METADATA STATE
+    const [ticketMeta, setTicketMeta] = useState(null);
+    const [ticketCreatedAt, setTicketCreatedAt] = useState(null);
 
     const handleFetch = async (e) => {
         e.preventDefault();
@@ -25,12 +26,13 @@ export function HomePage() {
         setErrorMsg('');
         setEvents([]);
         setTicketMeta(null);
+        setTicketCreatedAt(null);
 
         try {
             const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
             const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
-            // 1. FETCH TICKET METADATA CONCURRENTLY
+            // 1. FETCH TICKET METADATA
             const metaPromise = fetch(`${baseUrl}/api/ticket/${sanitizedId}`)
                 .then(res => res.json())
                 .then(res => {
@@ -43,21 +45,31 @@ export function HomePage() {
             let hasNext = true;
             let accumulatedEvents = [];
 
+            // ✅ FIX 1: Use a local variable to track creation date across pages
+            let localCreatedAt = null;
+
             while (hasNext) {
                 const cursorQuery = currentCursor ? `?cursor=${encodeURIComponent(currentCursor)}` : '';
                 const res = await fetch(`${baseUrl}/api/timeline/${sanitizedId}${cursorQuery}`);
                 const result = await res.json();
 
                 if (!res.ok || !result.success) throw new Error(result.message || 'API Error');
+                console.log("🔍 TIMELINE API PAYLOAD:", result);
+                // ✅ FIX 1: Check EVERY page for the creation date until we find it
+                if (!localCreatedAt) {
+                    localCreatedAt = result.ticketCreatedAt || result.data?.ticketCreatedAt;
+                }
 
-                accumulatedEvents = [...accumulatedEvents, ...result.data];
+                const newEvents = Array.isArray(result.data) ? result.data : result.data?.data || [];
+                accumulatedEvents = [...accumulatedEvents, ...newEvents];
 
-                currentCursor = result.next_cursor;
+                currentCursor = result.next_cursor || result.data?.next_cursor;
                 hasNext = !!currentCursor;
             }
 
-            if (accumulatedEvents.length === 0) {
-                throw new Error(`No stage telemetry found for ${sanitizedId}`);
+            // Save the exact creation date to state
+            if (localCreatedAt) {
+                setTicketCreatedAt(localCreatedAt);
             }
 
             // 3. RESOLVE METADATA
@@ -75,11 +87,10 @@ export function HomePage() {
         }
     };
 
-    // PASS THE SLA REGION INTO THE MATH ENGINE
     const metrics = useMemo(() => {
-        if (events.length === 0) return { hours: 0, mins: 0 };
-        return calculateRWT(events, ticketMeta?.slaRegion);
-    }, [events, ticketMeta]);
+        if (events.length === 0 && !ticketCreatedAt) return { hours: 0, mins: 0 };
+        return calculateRWT(events, ticketCreatedAt, ticketMeta?.slaRegion);
+    }, [events, ticketCreatedAt, ticketMeta]);
 
     return (
         <div className="max-w-7xl mx-auto p-6 md:p-10 flex flex-col gap-8">
@@ -87,8 +98,6 @@ export function HomePage() {
                 <div>
                     <div className="flex items-center gap-3">
                         <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">RWT Engine</h1>
-
-                        {/* DYNAMIC REGION BADGE */}
                         {ticketMeta && (
                             <span className="flex items-center gap-1.5 text-[10px] font-mono font-bold tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20 uppercase">
                                 <Globe className="w-3 h-3" />
@@ -142,7 +151,7 @@ export function HomePage() {
                             <RwtRules metrics={metrics} ticketId={ticketId} />
                         </div>
                         <div className="lg:col-span-2 h-full">
-                            <TelemetryTable events={events} />
+                            <TelemetryTable events={events} ticketCreatedAt={ticketCreatedAt} />
                         </div>
                     </div>
                 )}
