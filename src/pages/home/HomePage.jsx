@@ -29,7 +29,9 @@ export function HomePage() {
     const [ticketMeta, setTicketMeta] = useState(null);
     const [ticketCreatedAt, setTicketCreatedAt] = useState(null);
     const [firstResponseAt, setFirstResponseAt] = useState(null);
+
     const [customerReplies, setCustomerReplies] = useState([]);
+    const [agentReplies, setAgentReplies] = useState([]); // ✅ NEW: Agent replies state for FRR
 
     const triggerCooldown = useCallback(() => {
         setIsThrottled(true);
@@ -64,6 +66,7 @@ export function HomePage() {
         setTicketCreatedAt(null);
         setFirstResponseAt(null);
         setCustomerReplies([]);
+        setAgentReplies([]);
 
         try {
             const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -92,10 +95,12 @@ export function HomePage() {
             let localCreatedAt = null;
             let localFirstResponseAt = null;
             let localCustomerReplies = [];
+            let localAgentReplies = []; // ✅ Local state for agent replies
 
             const seenCursors = new Set();
             let pageCount = 0;
-            const MAX_PAGES = 30;
+            // 🚀 BUMPED: Increased from 30 to 150 to ensure we capture late-stage Solved/Closed events
+            const MAX_PAGES = 150;
 
             while (hasNext && pageCount < MAX_PAGES) {
                 pageCount++;
@@ -126,26 +131,58 @@ export function HomePage() {
                 const result = await timelineRes.json();
                 if (!result.success) throw new Error(result.message || 'API Error');
 
-                const payload = result.data || result;
-                if (!localCreatedAt) localCreatedAt = payload.ticketCreatedAt;
-                if (!localFirstResponseAt) localFirstResponseAt = payload.firstResponseAt;
+                const payload = result.data || {};
+                if (!localCreatedAt) localCreatedAt = result.ticketCreatedAt || payload.ticketCreatedAt;
+                if (!localFirstResponseAt) localFirstResponseAt = result.firstResponseAt || payload.firstResponseAt;
 
-                const newReplies = payload.customerReplyTimestamps || [];
+                const newReplies = result.customerReplyTimestamps || payload.customerReplyTimestamps || [];
                 localCustomerReplies = [...localCustomerReplies, ...newReplies];
 
-                const newEvents = Array.isArray(result.data) ? result.data : (result.data?.data || []);
+                // ✅ Extract Agent Replies from payload
+                const newAgentReplies = result.agentReplyTimestamps || payload.agentReplyTimestamps || [];
+                localAgentReplies = [...localAgentReplies, ...newAgentReplies];
+
+                const newEvents = Array.isArray(result.data) ? result.data : (payload.data || []);
                 accumulatedEvents = [...accumulatedEvents, ...newEvents];
 
-                currentCursor = result.next_cursor || result.nextCursor || result.data?.next_cursor;
+                currentCursor = result.next_cursor || result.nextCursor || payload.next_cursor || payload.nextCursor;
                 hasNext = !!currentCursor;
             }
 
-            if (localCreatedAt) setTicketCreatedAt(localCreatedAt);
+            if (pageCount >= MAX_PAGES) {
+                console.warn(`[Circuit Breaker] Hit maximum page limit (${MAX_PAGES}). Timeline may be truncated.`);
+                setHasPartialData(true);
+            }
+
+            // Lock in basic states
             if (localFirstResponseAt) setFirstResponseAt(localFirstResponseAt);
             setCustomerReplies(localCustomerReplies);
+            setAgentReplies(localAgentReplies); // ✅ Commit agent replies to state
             setTicketMeta(metaData);
 
-            const sortedEvents = accumulatedEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            // 4. SORT AND COMMIT
+            let sortedEvents = accumulatedEvents.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            const finalCreatedAt = localCreatedAt || metaData?.created_date || metaData?.createdDate || metaData?.created_at;
+
+            if (finalCreatedAt) {
+                setTicketCreatedAt(finalCreatedAt);
+
+                const backendProvidedOrigin = sortedEvents.length > 0 && sortedEvents[0].from === 'Ticket Created';
+
+                if (backendProvidedOrigin) {
+                    sortedEvents[0].isOrigin = true;
+                } else {
+                    const originEvent = {
+                        isOrigin: true,
+                        timestamp: finalCreatedAt,
+                        from: 'Ticket Created',
+                        to: sortedEvents.length > 0 ? sortedEvents[0].from : 'System'
+                    };
+                    sortedEvents.unshift(originEvent);
+                }
+            }
+
             setEvents(sortedEvents);
             setStatus('success');
 
@@ -167,13 +204,13 @@ export function HomePage() {
 
     const frrStatus = useMemo(() => {
         if (!events.length) return 'PENDING';
-        return calculateFRR(events, firstResponseAt || '', customerReplies);
-    }, [events, firstResponseAt, customerReplies]);
+        // ✅ Passed agentReplies array instead of firstResponseAt string
+        return calculateFRR(events, agentReplies);
+    }, [events, agentReplies]);
 
     return (
         <div className="relative min-h-screen bg-surface-primary text-text-primary selection:bg-brand-purple/30 font-sans overflow-hidden">
 
-            {/* 🎨 NEW: The Aurora Ambient Background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-brand-purple/20 rounded-full mix-blend-screen filter blur-[128px] opacity-60 animate-blob" />
                 <div className="absolute top-[20%] right-[-10%] w-96 h-96 bg-brand-cyan/20 rounded-full mix-blend-screen filter blur-[128px] opacity-60 animate-blob animation-delay-2000" />
@@ -198,7 +235,7 @@ export function HomePage() {
                             {hasPartialData && (
                                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] font-bold uppercase tracking-widest animate-fade-in shadow-[0_0_15px_rgba(245,158,11,0.2)]">
                                     <AlertCircle className="w-3 h-3" />
-                                    PARTIAL DATA (504)
+                                    PARTIAL DATA
                                 </div>
                             )}
                         </div>

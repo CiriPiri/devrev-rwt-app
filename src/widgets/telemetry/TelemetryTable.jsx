@@ -1,35 +1,21 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Copy, CheckCircle2, Clock } from 'lucide-react';
 
-export function TelemetryTable({ events = [], ticketCreatedAt }) {
+export function TelemetryTable({ events = [] }) {
     const [copied, setCopied] = useState(false);
 
-    // 🧠 ENGINEER: Memoize the derived state so we don't recalculate on every re-render
-    const displayEvents = useMemo(() => {
-        if (!ticketCreatedAt && (!events || events.length === 0)) return [];
-
-        const baseEvents = events || [];
-        return ticketCreatedAt
-            ? [
-                {
-                    isOrigin: true,
-                    timestamp: ticketCreatedAt,
-                    from: 'System Genesis',
-                    to: baseEvents.length > 0 ? baseEvents[0].from : 'Unassigned',
-                },
-                ...baseEvents,
-            ]
-            : baseEvents;
-    }, [events, ticketCreatedAt]);
+    // 🧠 ENGINEER: The table is now "dumb". It trusts HomePage.jsx to provide 
+    // the perfectly sorted array, including the injected 'isOrigin' row at index 0.
 
     const handleCopyTable = useCallback(() => {
-        if (displayEvents.length === 0) return;
+        if (events.length === 0) return;
 
         let markdown = `| Seq | Local Timestamp | Transition Origin | Target State |\n`;
         markdown += `|---|---|---|---|\n`;
 
-        displayEvents.forEach((ev, i) => {
-            const seq = ev.isOrigin ? '00' : (ticketCreatedAt ? i : i + 1).toString().padStart(2, '0');
+        events.forEach((ev, i) => {
+            // Because HomePage puts the origin row at index 0, the math is simple:
+            const seq = ev.isOrigin ? '00' : i.toString().padStart(2, '0');
             const time = new Date(ev.timestamp).toLocaleString(undefined, {
                 weekday: 'short', month: 'short', day: '2-digit',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -40,10 +26,10 @@ export function TelemetryTable({ events = [], ticketCreatedAt }) {
         navigator.clipboard.writeText(markdown);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    }, [displayEvents, ticketCreatedAt]);
+    }, [events]);
 
     // Empty State Handling
-    if (displayEvents.length === 0) {
+    if (events.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] border border-surface-accent/50 rounded-2xl bg-surface-secondary/20 backdrop-blur-md ring-1 ring-white/5">
                 <div className="relative mb-4">
@@ -64,13 +50,13 @@ export function TelemetryTable({ events = [], ticketCreatedAt }) {
                 <div className="flex items-center gap-3">
                     <h3 className="text-sm font-bold tracking-wide text-text-primary uppercase drop-shadow-sm">Event Ledger</h3>
                     <span className="flex items-center justify-center px-2 py-0.5 rounded-md bg-surface-accent/50 text-text-secondary text-[10px] font-mono border border-surface-accent/50 ring-1 ring-white/5 shadow-inner">
-                        {displayEvents.length} RECORDS
+                        {events.length} RECORDS
                     </span>
                 </div>
 
                 <button
                     onClick={handleCopyTable}
-                    disabled={displayEvents.length === 0}
+                    disabled={events.length === 0}
                     className="group relative flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
                              bg-surface-secondary/40 border-surface-accent/60 hover:bg-surface-secondary/80 hover:border-text-muted/50 text-text-secondary hover:text-white shadow-sm ring-1 ring-white/5"
                     aria-label="Export to Markdown"
@@ -98,8 +84,9 @@ export function TelemetryTable({ events = [], ticketCreatedAt }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-accent/20">
-                        {displayEvents.map((ev, i) => {
-                            const seq = ev.isOrigin ? '00' : (ticketCreatedAt ? i : i + 1).toString().padStart(2, '0');
+                        {events.map((ev, i) => {
+                            // If it's the injected origin row, label it '00'. Otherwise, pad the index.
+                            const seq = ev.isOrigin ? '00' : i.toString().padStart(2, '0');
 
                             // Native staggered entrance animation logic
                             const staggerDelay = `${i * 0.02}s`;

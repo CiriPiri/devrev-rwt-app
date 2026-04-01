@@ -23,36 +23,24 @@ export function calculateFRT(ticketCreatedAt, firstResponseAt) {
 
   return { hours, mins };
 }
-
 /**
- * Calculates First Response Resolution (FRR) using the "Agent Effort" rule.
- * FRR is "Yes" if the ticket is solved requiring exactly ONE agent reply.
- * @param {Array} events - The stage transition events array
+ * Calculates First Response Resolution (FRR) using a Live Agent Effort rule.
+ * FRR is "Yes" if there is exactly ONE agent reply, regardless of ticket stage.
+ * @param {Array} events - The stage transition events array (kept for signature compatibility)
  * @param {Array} agentReplyTimestamps - Array of ISO 8601 timestamps of agent replies
  * @returns {string} "Yes", "No", or "Pending"
  */
 export function calculateFRR(events, agentReplyTimestamps = []) {
-  if (!events || events.length === 0) return "Pending";
+  // 1. If no agent has replied yet, the metric is Pending.
+  if (!agentReplyTimestamps || agentReplyTimestamps.length === 0) {
+    return "Pending";
+  }
 
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
-  );
-  const finalState = sortedEvents[sortedEvents.length - 1].to.toLowerCase();
+  // 2. The Live "Agent Effort" Rule: Exactly ONE reply means FRR is intact ("Yes").
+  if (agentReplyTimestamps.length === 1) {
+    return "Yes";
+  }
 
-  const isResolved =
-    finalState === "solved" ||
-    finalState === "closed" ||
-    finalState === "resolved";
-
-  // 1. If not closed yet, it's pending.
-  if (!isResolved) return "Pending";
-
-  // 2. If it was solved without an agent ever replying (Silent Solve).
-  if (agentReplyTimestamps.length === 0) return "No";
-
-  // 3. The "Agent Effort" Rule: If the agent replied exactly ONCE, it is FRR Yes!
-  if (agentReplyTimestamps.length === 1) return "Yes";
-
-  // 4. If the agent had to reply 2 or more times, it is FRR No.
+  // 3. The moment the agent has to reply 2 or more times, FRR is lost ("No").
   return "No";
 }
