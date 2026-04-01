@@ -56,14 +56,17 @@ export function getWorkingMinutes(startTimeIso, endTimeIso, schedule) {
       continue;
     }
 
-    // 2. Before Start Time -> Fast forward to exactly Start Time today
+    // 2. Before Start Time -> Fast forward to exactly Start Time today (IST forced via UTC)
     const startOfDay = new Date(current);
-    startOfDay.setHours(schedule.startHour, schedule.startMin, 0, 0);
+    // Calculate UTC hours/mins by subtracting 5 hours and 30 mins (IST offset)
+    let utcStartHour = schedule.startHour - 5;
+    let utcStartMin = schedule.startMin - 30;
 
-    if (current < startOfDay) {
-      current = startOfDay;
-      continue;
+    if (utcStartMin < 0) {
+      utcStartMin += 60;
+      utcStartHour -= 1;
     }
+    startOfDay.setUTCHours(utcStartHour, utcStartMin, 0, 0);
 
     // 3. After End Time -> Fast forward to Start Time tomorrow
     const endOfDay = new Date(current);
