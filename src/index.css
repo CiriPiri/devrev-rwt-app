@@ -1,15 +1,57 @@
 @import "tailwindcss";
 
 @theme {
+  /* --- FONTS --- */
   --font-sans:
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono", "JetBrains Mono", "Menlo", monospace;
+
+  /* --- VERCEL BLACK SYSTEM --- */
+  --color-surface-primary: #000000; /* Pure Black */
+  --color-surface-secondary: #0a0a0a; /* Very Dark Gray (Cards) */
+  --color-surface-accent: #27272a; /* zinc-800 (Borders) */
+
+  --color-text-primary: #ffffff; /* Pure White */
+  --color-text-secondary: #a1a1aa; /* zinc-400 */
+  --color-text-muted: #52525b; /* zinc-500 */
+
+  /* We override the brand colors to strict monochrome, keeping semantics for errors/success */
+  --color-brand-indigo: #ffffff;
+  --color-brand-emerald: #10b981; /* Keep semantic success */
+  --color-brand-rose: #f43f5e; /* Keep semantic error */
+  --color-brand-cyan: #ffffff;
+  --color-brand-purple: #ffffff;
+
+  /* --- ANIMATIONS --- */
+  --animate-shimmer: shimmer 2s infinite linear;
+  --animate-fade-in: fadeIn 0.4s ease-out forwards;
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- BASE STYLES --- */
 @layer base {
   body {
-    background-color: #000000;
-    color: #ededed;
+    background-color: var(--color-surface-primary);
+    color: var(--color-text-primary);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }

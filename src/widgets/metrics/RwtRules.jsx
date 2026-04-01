@@ -8,7 +8,7 @@ export function RwtRules({
     ticketId = 'TKT-XXX'
 }) {
     const [copied, setCopied] = useState(false);
-    const [expanded, setExpanded] = useState('rwt'); // Default to first item open
+    const [expanded, setExpanded] = useState('rwt');
 
     const toggleRule = useCallback((id) => {
         setExpanded((prev) => (prev === id ? null : id));
@@ -28,28 +28,28 @@ export function RwtRules({
     }, [rwtMetrics, frtMetrics, frrStatus, ticketId]);
 
     return (
-        <div className="flex flex-col gap-5 w-full">
+        <div className="flex flex-col gap-5 w-full relative z-10">
             {/* Header Area */}
-            <div className="flex justify-between items-center px-1 border-b border-surface-accent/50 pb-2">
+            <div className="flex justify-between items-center px-1 border-b border-surface-accent/40 pb-3">
                 <div className="flex items-center gap-2.5">
                     <div className="relative flex items-center justify-center w-2 h-2">
-                        <div className="absolute w-full h-full rounded-full bg-brand-indigo animate-ping opacity-50" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-brand-indigo" />
+                        <div className="absolute w-full h-full rounded-full bg-brand-cyan animate-ping opacity-60" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-cyan" />
                     </div>
-                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">Metric Insights</h3>
+                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] drop-shadow-sm">Metric Insights</h3>
                 </div>
 
                 <button
                     onClick={handleCopyMetrics}
-                    className="group flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/50 rounded-md px-2 py-1 -mr-2"
+                    className="group flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/50 rounded-md px-2 py-1 -mr-2 hover:bg-surface-secondary/30"
                     aria-label="Copy metrics summary to clipboard"
                 >
                     {copied ? (
-                        <CheckCircle2 className="w-3 h-3 text-brand-emerald animate-in zoom-in duration-200" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-brand-emerald animate-in zoom-in duration-200" />
                     ) : (
-                        <Copy className="w-3 h-3 text-text-muted group-hover:text-text-primary transition-colors" />
+                        <Copy className="w-3.5 h-3.5 text-text-muted group-hover:text-text-primary transition-colors" />
                     )}
-                    <span className={copied ? "text-brand-emerald" : "text-text-muted group-hover:text-text-primary"}>
+                    <span className={copied ? "text-brand-emerald" : "text-text-muted group-hover:text-text-primary transition-colors"}>
                         {copied ? 'Copied' : 'Copy'}
                     </span>
                 </button>
@@ -73,9 +73,9 @@ export function RwtRules({
                     ]}
                 >
                     <div className="flex items-baseline gap-0.5 tabular-nums">
-                        <span className="text-3xl font-bold text-text-primary tracking-tight">{rwtMetrics?.hours || 0}</span>
+                        <span className="text-3xl font-bold text-text-primary tracking-tight drop-shadow-sm">{rwtMetrics?.hours || 0}</span>
                         <span className="text-xs font-bold text-text-muted mr-2">h</span>
-                        <span className="text-3xl font-bold text-text-primary tracking-tight">{rwtMetrics?.mins || 0}</span>
+                        <span className="text-3xl font-bold text-text-primary tracking-tight drop-shadow-sm">{rwtMetrics?.mins || 0}</span>
                         <span className="text-xs font-bold text-text-muted">m</span>
                     </div>
                 </MetricCard>
@@ -84,7 +84,7 @@ export function RwtRules({
                     id="frt"
                     title="First Response Time"
                     icon={<Zap className="w-3.5 h-3.5" />}
-                    accent="emerald"
+                    accent="cyan"
                     isExpanded={expanded === 'frt'}
                     onToggle={() => toggleRule('frt')}
                     formula="FRT = First Human Agent Reply - Creation Timestamp"
@@ -96,13 +96,13 @@ export function RwtRules({
                 >
                     {frtMetrics ? (
                         <div className="flex items-baseline gap-0.5 tabular-nums">
-                            <span className="text-3xl font-bold text-text-primary tracking-tight">{frtMetrics.hours || 0}</span>
+                            <span className="text-3xl font-bold text-text-primary tracking-tight drop-shadow-sm">{frtMetrics.hours || 0}</span>
                             <span className="text-xs font-bold text-text-muted mr-2">h</span>
-                            <span className="text-3xl font-bold text-text-primary tracking-tight">{frtMetrics.mins || 0}</span>
+                            <span className="text-3xl font-bold text-text-primary tracking-tight drop-shadow-sm">{frtMetrics.mins || 0}</span>
                             <span className="text-xs font-bold text-text-muted">m</span>
                         </div>
                     ) : (
-                        <span className="text-2xl font-bold text-text-muted/50 tracking-tight italic">Pending</span>
+                        <span className="text-2xl font-bold text-text-muted/40 tracking-tight italic">Pending</span>
                     )}
                 </MetricCard>
 
@@ -110,7 +110,7 @@ export function RwtRules({
                     id="frr"
                     title="First Response Resolution"
                     icon={<Target className="w-3.5 h-3.5" />}
-                    accent={frrStatus === 'YES' ? 'blue' : frrStatus === 'NO' ? 'rose' : 'zinc'}
+                    accent={frrStatus === 'YES' ? 'purple' : frrStatus === 'NO' ? 'rose' : 'zinc'}
                     isExpanded={expanded === 'frr'}
                     onToggle={() => toggleRule('frr')}
                     formula="FRR = (Final: Solved) AND (Total Agent Replies === 1)"
@@ -122,9 +122,9 @@ export function RwtRules({
                     ]}
                 >
                     <span className={`text-3xl font-black tracking-tighter uppercase tabular-nums
-                        ${frrStatus === 'YES' ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.4)]' :
-                            frrStatus === 'NO' ? 'text-brand-rose drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]' :
-                                'text-text-muted'}`}>
+                        ${frrStatus === 'YES' ? 'text-brand-purple drop-shadow-[0_0_12px_rgba(192,132,252,0.4)]' :
+                            frrStatus === 'NO' ? 'text-brand-rose drop-shadow-[0_0_12px_rgba(251,113,133,0.4)]' :
+                                'text-text-muted/60'}`}>
                         {frrStatus}
                     </span>
                 </MetricCard>
@@ -134,53 +134,50 @@ export function RwtRules({
 }
 
 function MetricCard({ id, title, icon, accent, children, isExpanded, onToggle, formula, rules }) {
-    // Designer Tokens mapping
+    // Designer Tokens mapping updated for Aurora Vibe
     const accentMap = {
-        indigo: "text-brand-indigo bg-brand-indigo/10 border-brand-indigo/20 ring-brand-indigo/20",
-        emerald: "text-brand-emerald bg-brand-emerald/10 border-brand-emerald/20 ring-brand-emerald/20",
-        blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 ring-blue-500/20",
-        rose: "text-brand-rose bg-brand-rose/10 border-brand-rose/20 ring-brand-rose/20",
-        zinc: "text-text-muted bg-surface-accent border-surface-accent/80 ring-surface-accent/20"
+        indigo: "text-brand-indigo bg-brand-indigo/10 border-brand-indigo/20 shadow-[0_0_15px_rgba(129,140,248,0.15)]",
+        cyan: "text-brand-cyan bg-brand-cyan/10 border-brand-cyan/20 shadow-[0_0_15px_rgba(34,211,238,0.15)]",
+        emerald: "text-brand-emerald bg-brand-emerald/10 border-brand-emerald/20 shadow-[0_0_15px_rgba(52,211,153,0.15)]",
+        purple: "text-brand-purple bg-brand-purple/10 border-brand-purple/20 shadow-[0_0_15px_rgba(192,132,252,0.15)]",
+        rose: "text-brand-rose bg-brand-rose/10 border-brand-rose/20 shadow-[0_0_15px_rgba(251,113,133,0.15)]",
+        zinc: "text-text-muted bg-surface-accent/30 border-surface-accent/50"
     };
 
     const isPending = accent === 'zinc';
 
     return (
-        <div className={`group relative flex flex-col border rounded-xl overflow-hidden transition-all duration-300
-            ${isExpanded ? 'bg-surface-secondary/80 border-surface-accent shadow-lg' : 'bg-surface-secondary/40 border-surface-accent/50 hover:bg-surface-secondary hover:border-surface-accent'}
-            ${isExpanded && !isPending ? 'shadow-[0_4px_24px_-8px_var(--tw-shadow-color)]' : ''}
+        <div className={`group relative flex flex-col border rounded-xl overflow-hidden transition-all duration-300 backdrop-blur-md ring-1 ring-white/5
+            ${isExpanded
+                ? 'bg-surface-secondary/50 border-surface-accent/80 shadow-2xl'
+                : 'bg-surface-secondary/20 border-surface-accent/30 hover:bg-surface-secondary/40 hover:border-surface-accent/60'}
             `}
-            style={{
-                '--tw-shadow-color':
-                    accent === 'indigo' ? 'rgba(99,102,241,0.15)' :
-                        accent === 'emerald' ? 'rgba(16,185,129,0.15)' :
-                            accent === 'blue' ? 'rgba(96,165,250,0.15)' :
-                                accent === 'rose' ? 'rgba(244,63,94,0.15)' : 'transparent'
-            }}
         >
             {/* Interactive Header */}
             <button
                 onClick={onToggle}
                 aria-expanded={isExpanded}
                 aria-controls={`sect-${id}`}
-                className="w-full text-left p-4 flex items-start justify-between focus:outline-none focus-visible:bg-surface-secondary/80"
+                className="w-full text-left p-4 flex items-start justify-between focus:outline-none focus-visible:bg-surface-secondary/60"
             >
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2.5">
-                        <div className={`p-1.5 rounded-lg flex items-center justify-center border transition-colors ${accentMap[accent]}`}>
+                        <div className={`p-1.5 rounded-lg flex items-center justify-center border transition-all duration-300 ${accentMap[accent]}`}>
                             {icon}
                         </div>
                         <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${isExpanded ? 'text-text-primary' : 'text-text-secondary'}`}>
                             {title}
                         </span>
                     </div>
-                    <div className="pl-1 pt-1">
+                    <div className="pl-1 pt-1.5">
                         {children}
                     </div>
                 </div>
 
-                <div className={`mt-2 p-1.5 rounded-full transition-all duration-300 
-                    ${isExpanded ? 'bg-surface-accent text-text-primary rotate-180' : 'bg-transparent text-text-muted group-hover:bg-surface-accent/50 group-hover:text-text-secondary'}`}
+                <div className={`mt-2 p-1.5 rounded-full transition-all duration-300 border
+                    ${isExpanded
+                        ? 'bg-surface-accent/50 border-surface-accent text-text-primary rotate-180'
+                        : 'bg-surface-accent/10 border-transparent text-text-muted group-hover:bg-surface-accent/30 group-hover:border-surface-accent/50 group-hover:text-text-secondary'}`}
                 >
                     <ChevronDown className="w-3.5 h-3.5" />
                 </div>
@@ -195,21 +192,32 @@ function MetricCard({ id, title, icon, accent, children, isExpanded, onToggle, f
             >
                 <div className="overflow-hidden">
                     <div className="px-5 pb-5 pt-1">
-                        <div className="h-px w-full bg-gradient-to-r from-surface-accent/10 via-surface-accent to-surface-accent/10 mb-4" />
+                        <div className="h-px w-full bg-gradient-to-r from-transparent via-surface-accent/80 to-transparent mb-5" />
 
-                        <div className="mb-4">
-                            <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] block mb-1.5">Formula</span>
-                            <code className="text-[10px] font-mono text-brand-indigo leading-relaxed bg-brand-indigo/5 border border-brand-indigo/10 px-2.5 py-1.5 rounded block shadow-inner">
-                                {formula}
+                        <div className="mb-5">
+                            <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] block mb-2">Formula</span>
+                            <code className="text-[10px] font-mono text-text-primary leading-relaxed bg-surface-primary/50 border border-surface-accent/50 px-2.5 py-2 rounded-lg block shadow-inner ring-1 ring-black/20">
+                                <span className={
+                                    accent === 'indigo' ? 'text-brand-indigo' :
+                                        accent === 'cyan' ? 'text-brand-cyan' :
+                                            accent === 'purple' ? 'text-brand-purple' : 'text-text-secondary'
+                                }>
+                                    {formula.split('=')[0]}
+                                </span>
+                                = {formula.split('=')[1]}
                             </code>
                         </div>
 
                         <div>
                             <span className="text-[9px] font-bold text-text-muted uppercase tracking-[0.15em] block mb-2">Calculation Rules</span>
-                            <ul className="space-y-2">
+                            <ul className="space-y-2.5">
                                 {rules.map((rule, i) => (
-                                    <li key={i} className="text-[10px] text-text-secondary flex items-start gap-2.5 leading-relaxed">
-                                        <div className="w-1 h-1 rounded-full bg-surface-accent mt-[6px] flex-shrink-0" />
+                                    <li key={i} className="text-[10px] text-text-secondary flex items-start gap-3 leading-relaxed">
+                                        <div className={`w-1 h-1 rounded-full mt-[7px] flex-shrink-0 shadow-[0_0_8px_currentColor]
+                                            ${accent === 'indigo' ? 'bg-brand-indigo text-brand-indigo' :
+                                                accent === 'cyan' ? 'bg-brand-cyan text-brand-cyan' :
+                                                    accent === 'purple' ? 'bg-brand-purple text-brand-purple' : 'bg-surface-accent text-transparent'}`}
+                                        />
                                         <span>{rule}</span>
                                     </li>
                                 ))}
