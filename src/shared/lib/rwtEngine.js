@@ -1,17 +1,77 @@
-// src/shared/lib/rwtEngine.js
-
-// 1. STRICT REGIONAL SLA SCHEDULES (All times mapped to IST)
+// offsetMins: IST is +330 mins (+5:30), CST is -360 mins (-06:00)
 const SLA_SCHEDULES = {
-  "NAM (US)": { startHour: 7, startMin: 30, endHour: 17, endMin: 30 },
-  NAM: { startHour: 7, startMin: 30, endHour: 17, endMin: 30 },
-  MEA: { startHour: 10, startMin: 30, endHour: 18, endMin: 30 },
-  LATAM: { startHour: 7, startMin: 30, endHour: 17, endMin: 30 },
-  SEA: { startHour: 6, startMin: 30, endHour: 15, endMin: 30 },
-  APAC: { startHour: 6, startMin: 30, endHour: 15, endMin: 30 },
-  "EU Business hours": { startHour: 13, startMin: 30, endHour: 22, endMin: 30 },
-  EU: { startHour: 13, startMin: 30, endHour: 22, endMin: 30 },
-  India: { startHour: 9, startMin: 30, endHour: 17, endMin: 30 },
-  DEFAULT: { startHour: 9, startMin: 30, endHour: 17, endMin: 30 }, // Safe fallback
+  // --- NAM ALIASES ---
+  "NORTH AMERICA": {
+    startHour: 9,
+    startMin: 30,
+    endHour: 18,
+    endMin: 30,
+    offsetMins: -360,
+  },
+  "NAM (US)": {
+    startHour: 9,
+    startMin: 30,
+    endHour: 18,
+    endMin: 30,
+    offsetMins: -360,
+  },
+  NAM: {
+    startHour: 9,
+    startMin: 30,
+    endHour: 18,
+    endMin: 30,
+    offsetMins: -360,
+  },
+
+  // --- LATAM ALIASES ---
+  LATAM: {
+    startHour: 9,
+    startMin: 30,
+    endHour: 18,
+    endMin: 30,
+    offsetMins: -360,
+  },
+
+  // --- IST ALIASES ---
+  MEA: {
+    startHour: 10,
+    startMin: 30,
+    endHour: 18,
+    endMin: 30,
+    offsetMins: 330,
+  },
+  SEA: { startHour: 6, startMin: 30, endHour: 15, endMin: 30, offsetMins: 330 },
+  APAC: {
+    startHour: 6,
+    startMin: 30,
+    endHour: 15,
+    endMin: 30,
+    offsetMins: 330,
+  },
+
+  "EU Business hours": {
+    startHour: 13,
+    startMin: 30,
+    endHour: 22,
+    endMin: 30,
+    offsetMins: 330,
+  },
+  EU: { startHour: 13, startMin: 30, endHour: 22, endMin: 30, offsetMins: 330 },
+
+  India: {
+    startHour: 9,
+    startMin: 30,
+    endHour: 17,
+    endMin: 30,
+    offsetMins: 330,
+  },
+  DEFAULT: {
+    startHour: 9,
+    startMin: 30,
+    endHour: 17,
+    endMin: 30,
+    offsetMins: 330,
+  },
 };
 
 /**
@@ -19,7 +79,6 @@ const SLA_SCHEDULES = {
  */
 function getScheduleForRegion(regionName) {
   if (!regionName) return SLA_SCHEDULES["DEFAULT"];
-
   if (SLA_SCHEDULES[regionName]) return SLA_SCHEDULES[regionName];
 
   const upperRegion = regionName.toUpperCase();
@@ -34,76 +93,70 @@ function getScheduleForRegion(regionName) {
 
 /**
  * Calculates working minutes bounded dynamically by the SLA schedule.
- * @param {string} startTimeIso - ISO 8601 timestamp
- * @param {string} endTimeIso - ISO 8601 timestamp
- * @param {Object} schedule - { startHour, startMin, endHour, endMin }
- * @returns {number} Total valid business minutes
+ * Uses Timezone Shifting to handle local weekends safely.
  */
 export function getWorkingMinutes(startTimeIso, endTimeIso, schedule) {
-  let current = new Date(startTimeIso);
-  const endDate = new Date(endTimeIso);
+  // Convert offset to milliseconds
+  const offsetMs = schedule.offsetMins * 60000;
+
+  // Shift absolute UTC time into "Local-as-UTC" space
+  let currentMs = new Date(startTimeIso).getTime() + offsetMs;
+  const endMs = new Date(endTimeIso).getTime() + offsetMs;
   let minutes = 0;
 
-  if (current >= endDate) return 0;
+  if (currentMs >= endMs) return 0;
 
-  while (current < endDate) {
-    const day = current.getDay();
+  while (currentMs < endMs) {
+    const currentLocal = new Date(currentMs);
+    // Because we shifted the time, getUTCDay() accurately reflects the local day!
+    const day = currentLocal.getUTCDay();
 
     // 1. Skip weekends (0 = Sunday, 6 = Saturday)
     if (day === 0 || day === 6) {
-      current.setDate(current.getDate() + (day === 0 ? 1 : 2));
-      current.setHours(schedule.startHour, schedule.startMin, 0, 0);
+      currentLocal.setUTCDate(currentLocal.getUTCDate() + (day === 0 ? 1 : 2));
+      currentLocal.setUTCHours(schedule.startHour, schedule.startMin, 0, 0);
+      currentMs = currentLocal.getTime();
       continue;
     }
 
-    // 2. Before Start Time -> Fast forward to exactly Start Time today (IST forced via UTC)
-    const startOfDay = new Date(current);
-    // Calculate UTC hours/mins by subtracting 5 hours and 30 mins (IST offset)
-    let utcStartHour = schedule.startHour - 5;
-    let utcStartMin = schedule.startMin - 30;
+    // 2. Before Start Time -> Fast forward to exactly Start Time today
+    const startOfDay = new Date(currentMs);
+    startOfDay.setUTCHours(schedule.startHour, schedule.startMin, 0, 0);
 
-    if (utcStartMin < 0) {
-      utcStartMin += 60;
-      utcStartHour -= 1;
+    if (currentMs < startOfDay.getTime()) {
+      currentMs = startOfDay.getTime();
+      continue;
     }
-    startOfDay.setUTCHours(utcStartHour, utcStartMin, 0, 0);
 
     // 3. After End Time -> Fast forward to Start Time tomorrow
-    const endOfDay = new Date(current);
-    endOfDay.setHours(schedule.endHour, schedule.endMin, 0, 0);
+    const endOfDay = new Date(currentMs);
+    endOfDay.setUTCHours(schedule.endHour, schedule.endMin, 0, 0);
 
-    if (current >= endOfDay) {
-      current.setDate(current.getDate() + 1);
-      current.setHours(schedule.startHour, schedule.startMin, 0, 0);
+    if (currentMs >= endOfDay.getTime()) {
+      currentLocal.setUTCDate(currentLocal.getUTCDate() + 1);
+      currentLocal.setUTCHours(schedule.startHour, schedule.startMin, 0, 0);
+      currentMs = currentLocal.getTime();
       continue;
     }
 
-    // 4. Determine the next boundary (either the end of this shift, or the actual end time)
-    const nextBoundary = new Date(
-      Math.min(endDate.getTime(), endOfDay.getTime()),
-    );
+    // 4. Determine the next boundary and accumulate the delta
+    const nextBoundaryMs = Math.min(endMs, endOfDay.getTime());
 
-    // Accumulate the delta
-    minutes += (nextBoundary.getTime() - current.getTime()) / 60000;
+    // Because delta is (TimeB - TimeA), the offsetMs cancels out, giving true elapsed minutes
+    minutes += (nextBoundaryMs - currentMs) / 60000;
 
-    // Move the cursor forward
-    current = nextBoundary;
+    currentMs = nextBoundaryMs;
   }
+
   return minutes;
 }
 
 /**
  * Parses DevRev timeline events to extract total active RWT based on Region.
- * @param {Array} events - Array of telemetry objects { timestamp, from, to }
- * @param {string} ticketCreatedAt - ISO 8601 timestamp of exact ticket creation
- * @param {string} regionName - The SLA Region string from the ticket metadata
- * @returns {Object} { hours, mins }
  */
 export function calculateRWT(events, ticketCreatedAt, regionName = "DEFAULT") {
   const schedule = getScheduleForRegion(regionName);
 
-  // ✅ NEW SAFEGUARD: If the ticket is brand new and has 0 timeline events,
-  // we still calculate the active time since it was created.
   if (!events || !Array.isArray(events) || events.length === 0) {
     if (!ticketCreatedAt) return { hours: 0, mins: 0 };
 
@@ -119,25 +172,17 @@ export function calculateRWT(events, ticketCreatedAt, regionName = "DEFAULT") {
   }
 
   const openStates = ["queued", "waiting on assignee", "waiting on clevertap"];
-
   let totalMinutes = 0;
-
-  // ✅ THE NEW LOGIC: Unconditionally start the clock at the exact creation time.
-  // This guarantees any initial triage delay (e.g., 1 PM creation -> 4 PM moved to queue)
-  // is perfectly captured as active RWT.
   let lastOpenTime = ticketCreatedAt;
 
   events.forEach((ev) => {
     const toState = ev.to.toLowerCase();
 
     if (openStates.includes(toState)) {
-      // If we move into an active state and the clock isn't running, start it.
       if (!lastOpenTime) {
         lastOpenTime = ev.timestamp;
       }
-      // (If lastOpenTime is already running from ticketCreatedAt, it just keeps ticking).
     } else {
-      // If we move into a paused state (like 'solved'), stop the clock and tally the minutes.
       if (lastOpenTime) {
         totalMinutes += getWorkingMinutes(lastOpenTime, ev.timestamp, schedule);
         lastOpenTime = null;
@@ -145,7 +190,6 @@ export function calculateRWT(events, ticketCreatedAt, regionName = "DEFAULT") {
     }
   });
 
-  // If the ticket is currently sitting in an active state right now, calculate up to this exact moment.
   if (lastOpenTime) {
     totalMinutes += getWorkingMinutes(
       lastOpenTime,
